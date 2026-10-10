@@ -56,7 +56,7 @@
     "friendsofsymfony/rest-bundle": "~1.7.1",
     "partkeepr/extjs6": "dev-master",
     "fortawesome/font-awesome": "4.*",
-    "doctrine/doctrine-fixtures-bundle": "2.2.*",
+    "doctrine/doctrine-fixtures-bundle": "2.4.*",
     "dunglas/api-bundle": "dev-master#b30de689f94410c7dc0e449f2ecc15cfa8e70f54",
     "brainbits/fugue-icons-bundle": "^3.5",
     "imagine/imagine": "^0.6.2",
