@@ -41,6 +41,11 @@ Full example:
 | `Unit tests (dependency-free)` | Runs the unit tests which neither boot the kernel nor need a database. |
 | `PHPUnit (PHP 7.1, sqlite/mysql/pgsql)` | Installs the dependencies, creates the test schema and runs the full suite against all three databases. The coverage report is uploaded as the `coverage-clover` artifact. |
 
+The first three jobs are deterministic and are the gate for a pull request. The functional matrix is marked
+`continue-on-error`: the functional suite predates any CI and has never been green, because a few of its tests depend
+on the live `partkeepr.org` tips feed or on serialization details which differ on the runner. The matrix still runs so
+the failures stay visible, but it does not block a pull request until those tests are repaired.
+
 The jobs use PHP 7.1 (the version of `docker/base-dev/Dockerfile`) and select the test database through the
 `SYMFONY__TESTDB` environment variable described above. The sqlite job doesn't need any database server, while the
 mysql and pgsql jobs use the servers which are pre-installed on the GitHub runner.
