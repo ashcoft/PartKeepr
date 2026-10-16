@@ -1,5 +1,5 @@
 
-FROM mariadb:10.1
+FROM mariadb:10.11
 RUN apt-get update && apt-get install -y netcat && apt-get clean
 
 COPY command.sh /usr/local/bin/initdb.sh
