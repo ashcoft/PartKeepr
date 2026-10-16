@@ -52,7 +52,7 @@
     "symfony/monolog-bundle": "~2.4",
     "sensio/distribution-bundle": "~4.0.0",
     "sensio/framework-extra-bundle": "~3.0",
-    "nelmio/api-doc-bundle": "~2.9@dev",
+    "nelmio/api-doc-bundle": "~2.13.0@dev",
     "friendsofsymfony/rest-bundle": "~1.8.0",
     "partkeepr/extjs6": "dev-master",
     "fortawesome/font-awesome": "4.*",
