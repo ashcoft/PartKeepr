@@ -15,7 +15,7 @@ jobs:
     name: Create the base image
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v7
     - name: Fetch git tags
       run: git fetch --unshallow origin +refs/tags/*:refs/tags/*
       
@@ -36,7 +36,7 @@ jobs:
     name: Create the development image
     
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v7
     - name: Fetch git tags
       run: git fetch --unshallow origin +refs/tags/*:refs/tags/*
       
