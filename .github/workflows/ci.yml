@@ -62,6 +62,50 @@ jobs:
             | xargs -0 -n1 -P4 php -l > /dev/null
           echo "All PHP files passed the syntax check."
 
+  unit-tests:
+    name: Unit tests (dependency-free)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.1'
+          extensions: ldap, intl, gd, bcmath, pdo_mysql, pdo_pgsql, pdo_sqlite, curl, mbstring, zip
+          ini-values: memory_limit=512M, date.timezone=UTC
+          coverage: none
+          tools: composer:v1
+
+      - name: Get the composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-7.1-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-php-7.1-composer-
+
+      - name: Create app/config/parameters.php
+        run: cp app/config/parameters.php.dist app/config/parameters.php
+
+      - name: Install composer dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth": {"github.com": "${{ secrets.GITHUB_TOKEN }}"}}'
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Run the dependency-free unit tests
+        run: |
+          for testFile in \
+            src/PartKeepr/CoreBundle/Tests/Services/SystemServiceTest.php \
+            src/PartKeepr/ImportBundle/Tests/Configuration/FieldConfigurationTest.php; do
+            vendor/bin/phpunit -c app/ "$testFile"
+          done
+
   tests:
     name: PHPUnit (PHP 7.1, ${{ matrix.db }})
     runs-on: ubuntu-24.04
@@ -91,6 +135,17 @@ jobs:
           ini-values: memory_limit=512M, date.timezone=UTC, xdebug.max_nesting_level=1000, pdo_mysql.default_socket=/var/run/mysqld/mysqld.sock
           coverage: xdebug
           tools: composer:v1
+
+      - name: Get the composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-7.1-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-php-7.1-composer-
 
       - name: Start MySQL and create the test database
         if: matrix.db == 'mysql'

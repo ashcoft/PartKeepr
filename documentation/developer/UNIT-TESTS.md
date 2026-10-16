@@ -32,14 +32,14 @@ Full example:
 
 ## Continuous Integration
 
-`ci/github-actions.yml` (to be moved to `.github/workflows/ci.yml`, see
-`ci/README.md`) runs on every pull request and on every push to `master`:
+`.github/workflows/ci.yml` runs on every pull request and on every push to `master`:
 
 | Job | Description |
 | --- | --- |
 | `composer.json / composer.lock` | Validates `composer.json` and fails when `composer.lock` is not in sync with it. |
 | `PHP syntax` | Runs `php -l` over every file in `app/` and `src/`. |
-| `PHPUnit (PHP 7.1, sqlite/mysql/pgsql)` | Installs the dependencies, creates the test schema and runs the test suite against all three databases. The coverage report is uploaded as the `coverage-clover` artifact. |
+| `Unit tests (dependency-free)` | Runs the unit tests which neither boot the kernel nor need a database. |
+| `PHPUnit (PHP 7.1, sqlite/mysql/pgsql)` | Installs the dependencies, creates the test schema and runs the full suite against all three databases. The coverage report is uploaded as the `coverage-clover` artifact. |
 
 The jobs use PHP 7.1 (the version of `docker/base-dev/Dockerfile`) and select the test database through the
 `SYMFONY__TESTDB` environment variable described above. The sqlite job doesn't need any database server, while the
