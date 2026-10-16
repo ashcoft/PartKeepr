@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  composer:
+    name: composer.json / composer.lock
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.1'
+          coverage: none
+          tools: composer:v1
+
+      - name: Validate composer.json
+        run: composer validate --no-check-publish
+
+      - name: Check that composer.lock is in sync with composer.json
+        run: |
+          composer validate --no-check-publish | tee composer-validate.log
+          if grep -q 'lock file is not up to date' composer-validate.log; then
+            echo "::error::composer.lock is not in sync with composer.json - run 'composer update --lock' and commit the result"
+            exit 1
+          fi
+
+  lint:
+    name: PHP syntax
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.1'
+          coverage: none
+
+      - name: Lint all PHP files
+        run: |
+          find app src -type f -name '*.php' -not -path '*/cache/*' -print0 \
+            | xargs -0 -n1 -P4 php -l > /dev/null
+          echo "All PHP files passed the syntax check."
+
+  tests:
+    name: PHPUnit (PHP 7.1, ${{ matrix.db }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        db:
+          - sqlite
+          - mysql
+          - pgsql
+
+    env:
+      # app/config/config_test.yml selects the connection via the %testdb% parameter
+      SYMFONY__TESTDB: ${{ matrix.db }}
+      # avoid GitHub API rate limits when downloading dist packages
+      COMPOSER_AUTH: '{"github-oauth": {"github.com": "${{ secrets.GITHUB_TOKEN }}"}}'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.1'
+          extensions: ldap, intl, gd, bcmath, pdo_mysql, pdo_pgsql, pdo_sqlite, curl, mbstring, zip
+          ini-values: memory_limit=512M, date.timezone=UTC, xdebug.max_nesting_level=1000, pdo_mysql.default_socket=/var/run/mysqld/mysqld.sock
+          coverage: xdebug
+          tools: composer:v1
+
+      - name: Start MySQL and create the test database
+        if: matrix.db == 'mysql'
+        run: |
+          sudo systemctl start mysql.service
+          mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS partkeepr_test;"
+          mysql -uroot -proot -e "CREATE USER IF NOT EXISTS 'travis'@'localhost' IDENTIFIED WITH mysql_native_password BY ''; GRANT ALL PRIVILEGES ON partkeepr_test.* TO 'travis'@'localhost'; FLUSH PRIVILEGES;"
+
+      - name: Start PostgreSQL and create the test database
+        if: matrix.db == 'pgsql'
+        run: |
+          sudo systemctl start postgresql.service
+          sudo -u postgres psql -c "CREATE ROLE travis WITH LOGIN SUPERUSER;"
+          sudo -u postgres psql -c "CREATE DATABASE partkeepr_test OWNER travis;"
+          sudo sed -i -E 's#^(host[[:space:]]+all[[:space:]]+all[[:space:]]+(127\.0\.0\.1/32|::1/128)[[:space:]]+).*#\1trust#' /etc/postgresql/*/main/pg_hba.conf
+          sudo systemctl restart postgresql.service
+
+      - name: Create app/config/parameters.php
+        run: cp app/config/parameters.php.dist app/config/parameters.php
+
+      - name: Install composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare cache and report directories
+        run: |
+          mkdir -p reports/coverage
+          app/console cache:warmup --env=test
+
+      - name: Create the test database schema
+        run: app/console doctrine:schema:create --env=test
+
+      - name: Run the test suite
+        run: vendor/bin/phpunit -c app/ --coverage-clover reports/clover.xml
+
+      - name: Upload the coverage report
+        if: always() && matrix.db == 'sqlite'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-clover
+          path: reports/clover.xml
+          if-no-files-found: warn
